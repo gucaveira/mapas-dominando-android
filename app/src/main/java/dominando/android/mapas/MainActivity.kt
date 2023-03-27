@@ -13,10 +13,13 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.GoogleApiAvailability
-import dominando.android.mapas.MapViewModel.*
+import dominando.android.mapas.MapViewModel.LocationError
 
 class MainActivity : AppCompatActivity() {
+
     private val viewModel: MapViewModel by viewModels()
+
+    private var isGpsDialogOpened: Boolean = false
 
     private val fragment: AppMapFragment by lazy {
         supportFragmentManager.findFragmentById(R.id.fragmentMap) as AppMapFragment
@@ -25,6 +28,12 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+        isGpsDialogOpened = savedInstanceState?.getBoolean(EXTRA_GPS_DIALOG) ?: false
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putBoolean(EXTRA_GPS_DIALOG, isGpsDialogOpened)
     }
 
     override fun onStart() {
@@ -42,8 +51,22 @@ class MainActivity : AppCompatActivity() {
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == REQUEST_ERROR_PLAY_SERVICES && resultCode == Activity.RESULT_OK) {
-            viewModel.connectGoogleApiClient()
+
+        when {
+            requestCode == REQUEST_ERROR_PLAY_SERVICES && resultCode == Activity.RESULT_OK -> {
+                viewModel.connectGoogleApiClient()
+
+            }
+
+            requestCode == REQUEST_CHECK_GPS -> {
+                isGpsDialogOpened = false
+                if (resultCode == RESULT_OK) {
+                    loadLastLocation()
+                } else {
+                    Toast.makeText(this, R.string.map_error_gps_disabled, Toast.LENGTH_SHORT).show()
+                    finish()
+                }
+            }
         }
     }
 
@@ -81,10 +104,16 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun handleLocationError(error: LocationError?) {
-        error?.let {
+        if (error != null) {
             when (error) {
-                is LocationError.ErrorLocationUnavailable ->
-                    showError(R.string.map_error_get_current_location)
+                is LocationError.ErrorLocationUnavailable -> showError(R.string.map_error_get_current_location)
+                is LocationError.GpsDisabled -> {
+                    if (isGpsDialogOpened.not()) {
+                        isGpsDialogOpened = true
+                        error.exception.startResolutionForResult(this, REQUEST_CHECK_GPS)
+                    }
+                }
+                is LocationError.GpsSettingUnavailable -> showError(R.string.map_error_gps_settings)
             }
         }
     }
@@ -131,5 +160,7 @@ class MainActivity : AppCompatActivity() {
     companion object {
         private const val REQUEST_ERROR_PLAY_SERVICES = 1
         private const val REQUEST_PERMISSIONS = 2
+        private const val REQUEST_CHECK_GPS = 3
+        private const val EXTRA_GPS_DIALOG = "gpsDialogIsOpen"
     }
 }
