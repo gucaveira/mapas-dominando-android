@@ -5,7 +5,10 @@ import android.app.Activity
 import android.content.Intent
 import android.content.IntentSender
 import android.content.pm.PackageManager
+import android.location.Address
 import android.os.Bundle
+import android.view.View
+import android.view.inputmethod.InputMethodManager
 import android.widget.Toast
 import androidx.activity.viewModels
 import androidx.annotation.StringRes
@@ -14,10 +17,13 @@ import androidx.core.app.ActivityCompat
 import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.GoogleApiAvailability
 import dominando.android.mapas.MapViewModel.LocationError
+import dominando.android.mapas.databinding.ActivityMainBinding
 
 class MainActivity : AppCompatActivity() {
 
     private val viewModel: MapViewModel by viewModels()
+
+    private lateinit var binding: ActivityMainBinding
 
     private var isGpsDialogOpened: Boolean = false
 
@@ -27,7 +33,8 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
+        binding = ActivityMainBinding.inflate(layoutInflater)
+        setContentView(binding.root)
         isGpsDialogOpened = savedInstanceState?.getBoolean(EXTRA_GPS_DIALOG) ?: false
     }
 
@@ -101,6 +108,45 @@ class MainActivity : AppCompatActivity() {
         viewModel.getCurrentLocationError().observe(this) { error ->
             handleLocationError(error)
         }
+
+        viewModel.isLoading().observe(this) { value ->
+            value?.let {
+                binding.btnSearch.isEnabled = value.not()
+
+                if (value) {
+                    showProgress(getString(R.string.map_msg_search_address))
+                } else {
+                    hideProgress()
+                }
+            }
+        }
+
+        viewModel.getAddresses().observe(this) { addresses ->
+            addresses?.let {
+                showAddressListDialog(addresses)
+            }
+        }
+
+        binding.btnSearch.setOnClickListener { searchAddress() }
+    }
+
+    private fun searchAddress() {
+        val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
+        imm.hideSoftInputFromWindow(binding.edtSearch.windowToken, 0)
+        viewModel.searchAddress(binding.edtSearch.text.toString())
+    }
+
+    private fun showProgress(message: String) {
+        binding.layoutLoadingInclude.txtProgress.text = message
+        binding.layoutLoadingInclude.llProgress.visibility = View.VISIBLE
+    }
+
+    private fun hideProgress() {
+        binding.layoutLoadingInclude.llProgress.visibility = View.GONE
+    }
+
+    private fun showAddressListDialog(addresses: List<Address>) {
+        AddressListFragment.newInstance(addresses).show(supportFragmentManager, null)
     }
 
     private fun handleLocationError(error: LocationError?) {

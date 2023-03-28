@@ -2,6 +2,8 @@ package dominando.android.mapas
 
 import android.annotation.SuppressLint
 import android.app.Application
+import android.location.Address
+import android.location.Geocoder
 import android.location.Location
 import android.os.Bundle
 import androidx.lifecycle.AndroidViewModel
@@ -19,6 +21,7 @@ import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.LocationSettingsRequest
 import com.google.android.gms.location.LocationSettingsStatusCodes.*
 import com.google.android.gms.maps.model.LatLng
+import java.util.*
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
@@ -38,6 +41,8 @@ class MapViewModel(app: Application) : AndroidViewModel(app), CoroutineScope {
         LocationServices.getFusedLocationProviderClient(getContext())
     }
 
+    private val addresses = MutableLiveData<List<Address>?>()
+    private val loading = MutableLiveData<Boolean>()
     private val connectionStatus = MutableLiveData<GoogleApiConnectionStatus>()
     private val currentLocationError = MutableLiveData<LocationError>()
     private val mapState = MutableLiveData<MapState>().apply {
@@ -49,11 +54,35 @@ class MapViewModel(app: Application) : AndroidViewModel(app), CoroutineScope {
         job.cancel()
     }
 
+    fun clearSearchAddressResult() {
+        addresses.value = null
+    }
+
+    fun setDestination(latLng: LatLng) {
+        addresses.value = null
+        mapState.value = mapState.value?.copy(destination = latLng)
+    }
+
     fun getConnectionStatus(): LiveData<GoogleApiConnectionStatus> = connectionStatus
 
     fun getCurrentLocationError(): LiveData<LocationError> = currentLocationError
 
     fun getMapState(): LiveData<MapState> = mapState
+
+    fun getAddresses(): LiveData<List<Address>?>  = addresses
+
+    fun isLoading(): LiveData<Boolean> = loading
+
+    fun searchAddress(searchLocation: String) {
+        launch {
+            loading.value = true
+            val geoCoder = Geocoder(getContext(), Locale.getDefault())
+            addresses.value = withContext(Dispatchers.IO) {
+                geoCoder.getFromLocationName(searchLocation, 10)
+            }
+            loading.value = false
+        }
+    }
 
     fun connectGoogleApiClient() {
         if (googleApiClient == null) {
@@ -180,7 +209,7 @@ class MapViewModel(app: Application) : AndroidViewModel(app), CoroutineScope {
     private fun getContext() = getApplication<Application>()
 
     // Data classes -----------
-    data class MapState(val origin: LatLng? = null)
+    data class MapState(val origin: LatLng? = null, val destination: LatLng? = null)
     data class GoogleApiConnectionStatus(
         val success: Boolean,
         val connectionResult: ConnectionResult? = null,
