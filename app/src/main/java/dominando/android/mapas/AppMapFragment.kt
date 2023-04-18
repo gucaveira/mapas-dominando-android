@@ -1,11 +1,13 @@
 package dominando.android.mapas
 
+import android.graphics.Color
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.OnMapReadyCallback
 import com.google.android.gms.maps.SupportMapFragment
 import com.google.android.gms.maps.model.LatLngBounds
 import com.google.android.gms.maps.model.MarkerOptions
+import com.google.android.gms.maps.model.PolylineOptions
 import org.koin.androidx.viewmodel.ext.android.activityViewModel
 
 class AppMapFragment : SupportMapFragment() {
@@ -43,6 +45,15 @@ class AppMapFragment : SupportMapFragment() {
             val area = LatLngBounds.Builder()
             val origin = mapState.origin
             val destination = mapState.destination
+            val route = mapState.route
+
+            if (route != null && route.isNotEmpty()) {
+                val polylineOptions = PolylineOptions().addAll(route).width(5f)
+                    .color(Color.RED).visible(true)
+                addPolyline(polylineOptions)
+                route.forEach { area.include(it) }
+            }
+
 
             origin?.let {
                 addMarker(

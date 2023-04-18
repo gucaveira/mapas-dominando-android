@@ -126,6 +126,16 @@ class MainActivity : AppCompatActivity() {
                 showAddressListDialog(addresses)
             }
         }
+        viewModel.isLoadingRoute().observe(this) { value ->
+            if (value != null) {
+                binding.btnSearch.isEnabled = !value
+                if (value) {
+                    showProgress(getString(R.string.map_msg_search_route))
+                } else {
+                    hideProgress()
+                }
+            }
+        }
 
         binding.btnSearch.setOnClickListener { searchAddress() }
     }

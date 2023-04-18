@@ -41,6 +41,7 @@ class MapViewModel(app: Application) : AndroidViewModel(app), CoroutineScope {
         LocationServices.getFusedLocationProviderClient(getContext())
     }
 
+    private val loadingRoute = MutableLiveData<Boolean>()
     private val addresses = MutableLiveData<List<Address>?>()
     private val loading = MutableLiveData<Boolean>()
     private val connectionStatus = MutableLiveData<GoogleApiConnectionStatus>()
@@ -61,6 +62,7 @@ class MapViewModel(app: Application) : AndroidViewModel(app), CoroutineScope {
     fun setDestination(latLng: LatLng) {
         addresses.value = null
         mapState.value = mapState.value?.copy(destination = latLng)
+        loadRoute()
     }
 
     fun getConnectionStatus(): LiveData<GoogleApiConnectionStatus> = connectionStatus
@@ -69,9 +71,30 @@ class MapViewModel(app: Application) : AndroidViewModel(app), CoroutineScope {
 
     fun getMapState(): LiveData<MapState> = mapState
 
-    fun getAddresses(): LiveData<List<Address>?>  = addresses
+    fun getAddresses(): LiveData<List<Address>?> = addresses
 
     fun isLoading(): LiveData<Boolean> = loading
+
+    fun isLoadingRoute(): LiveData<Boolean> = loadingRoute
+
+    private fun loadRoute() {
+        mapState.value?.let {
+            val orig = mapState.value?.origin
+            val dest = mapState.value?.destination
+
+            if (orig != null && dest != null) {
+                launch {
+                    loadingRoute.value = true
+                    val route = withContext(Dispatchers.IO) {
+                        RouteHttp.searchRoute(orig, dest)
+                    }
+
+                    mapState.value = mapState.value?.copy(route = route)
+                    loadingRoute.value = false
+                }
+            }
+        }
+    }
 
     fun searchAddress(searchLocation: String) {
         launch {
@@ -133,18 +156,18 @@ class MapViewModel(app: Application) : AndroidViewModel(app), CoroutineScope {
 
             locationClient.requestLocationUpdates(locationRequest, object : LocationCallback() {
 
-                    override fun onLocationResult(result: LocationResult) {
-                        super.onLocationResult(result)
+                override fun onLocationResult(result: LocationResult) {
+                    super.onLocationResult(result)
 
-                        locationClient.removeLocationUpdates(this)
-                        val location = result.lastLocation
-                        if (location != null) {
-                            updateOriginByLocation(location)
-                        } else {
-                            continuation.resume(false)
-                        }
+                    locationClient.removeLocationUpdates(this)
+                    val location = result.lastLocation
+                    if (location != null) {
+                        updateOriginByLocation(location)
+                    } else {
+                        continuation.resume(false)
                     }
-                }, null)
+                }
+            }, null)
         }
 
         locationClient.lastLocation.addOnSuccessListener { location ->
@@ -209,7 +232,12 @@ class MapViewModel(app: Application) : AndroidViewModel(app), CoroutineScope {
     private fun getContext() = getApplication<Application>()
 
     // Data classes -----------
-    data class MapState(val origin: LatLng? = null, val destination: LatLng? = null)
+    data class MapState(
+        val origin: LatLng? = null,
+        val destination: LatLng? = null,
+        val route: List<LatLng>? = null,
+    )
+
     data class GoogleApiConnectionStatus(
         val success: Boolean,
         val connectionResult: ConnectionResult? = null,
