@@ -5,7 +5,9 @@ import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.OnMapReadyCallback
 import com.google.android.gms.maps.SupportMapFragment
+import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.LatLngBounds
+import com.google.android.gms.maps.model.Marker
 import com.google.android.gms.maps.model.MarkerOptions
 import com.google.android.gms.maps.model.PolylineOptions
 import org.koin.androidx.viewmodel.ext.android.activityViewModel
@@ -16,6 +18,8 @@ class AppMapFragment : SupportMapFragment() {
 
     private var googleMap: GoogleMap? = null
 
+    private var markerCurrentLocation: Marker? = null
+
     override fun getMapAsync(callback: OnMapReadyCallback) {
         super.getMapAsync {
             googleMap = it
@@ -25,6 +29,21 @@ class AppMapFragment : SupportMapFragment() {
     }
 
     private fun setupMap() {
+        viewModel.getCurrentLocation().observe(this) { currentLocation ->
+            if (currentLocation != null) {
+                if (markerCurrentLocation == null) {
+                    val icon = BitmapDescriptorFactory.fromResource(R.drawable.blue_marker)
+
+                    markerCurrentLocation = googleMap?.addMarker(
+                        MarkerOptions().title(getString(R.string.map_current_location))
+                            .icon(icon)
+                            .position(currentLocation)
+                    )
+                }
+                markerCurrentLocation?.position = currentLocation
+            }
+        }
+
         googleMap?.run {
             mapType = GoogleMap.MAP_TYPE_NORMAL
             isMyLocationEnabled = true
@@ -40,6 +59,11 @@ class AppMapFragment : SupportMapFragment() {
     }
 
     private fun updateMap(mapState: MapViewModel.MapState) {
+        googleMap?.run {
+            clear()
+            markerCurrentLocation = null
+        }
+
         googleMap?.run {
             clear()
             val area = LatLngBounds.Builder()

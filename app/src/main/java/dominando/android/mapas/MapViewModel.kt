@@ -41,6 +41,11 @@ class MapViewModel(app: Application) : AndroidViewModel(app), CoroutineScope {
         LocationServices.getFusedLocationProviderClient(getContext())
     }
 
+    private val currentLocation = MutableLiveData<LatLng>()
+    fun getCurrentLocation(): LiveData<LatLng> {
+        return currentLocation
+    }
+
     private val loadingRoute = MutableLiveData<Boolean>()
     private val addresses = MutableLiveData<List<Address>?>()
     private val loading = MutableLiveData<Boolean>()
@@ -204,13 +209,40 @@ class MapViewModel(app: Application) : AndroidViewModel(app), CoroutineScope {
             .addOnCanceledListener { continuation.resume(false) }
     }
 
+    private val locationCallback = object : LocationCallback() {
+        override fun onLocationResult(locationResult: LocationResult) {
+            val location = locationResult.lastLocation
+            location?.let {
+                currentLocation.value = LatLng(
+                    location.latitude,
+                    location.longitude
+                )
+            }
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    fun startLocationUpdates() {
+        val locationRequest = LocationRequest.create()
+            .setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY)
+            .setInterval(5 * 1000)
+            .setFastestInterval(1 * 1000)
+        locationClient.requestLocationUpdates(locationRequest, locationCallback, null)
+    }
+
+    fun stopLocationUpdates() {
+        LocationServices.getFusedLocationProviderClient(getContext())
+            .removeLocationUpdates(locationCallback)
+    }
+
     fun requestLocation() = launch {
         currentLocationError.value = try {
 
             checkGpsStatus()
-            val success = withTimeout(20000) { loadLastLocation() }
+            val success = withTimeout(2000) { loadLastLocation() }
 
             if (success) {
+                startLocationUpdates()
                 null
             } else {
                 LocationError.ErrorLocationUnavailable

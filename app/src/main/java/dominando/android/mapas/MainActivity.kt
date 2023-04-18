@@ -54,6 +54,7 @@ class MainActivity : AppCompatActivity() {
     override fun onStop() {
         super.onStop()
         viewModel.disconnectGoogleApiClient()
+        viewModel.stopLocationUpdates()
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
@@ -212,6 +213,7 @@ class MainActivity : AppCompatActivity() {
             .getInstance()
             .getErrorDialog(this, errorCode, REQUEST_ERROR_PLAY_SERVICES)?.show()
     }
+
 
     companion object {
         private const val REQUEST_ERROR_PLAY_SERVICES = 1
